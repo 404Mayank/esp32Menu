@@ -28,6 +28,7 @@ struct menuItem {
   menuItem* child;
   menuItem* next;
   menuItem* prev;
+  menuItem* parentMenuHead;
 };
 
 struct menuDef {
@@ -61,10 +62,23 @@ void fun5() {
   Serial.println("fun5: Showing AP IP QR Code...");
 }
 
+void fun6() {
+  Serial.println("fun6: Toggling WiFi...");
+}
+
+void fun7() {
+  Serial.println("fun7: Toggling AP...");
+}
+
+// Menu Defination = {name, action, sub menu definition, last menu head position(self-managed) }
+// Declare menu heigrarchy Bottom -> Top 
+
 menuDef QRCodesDef[] = {
   {"Show AP QR", fun3, nullptr},
   {"Show WiFi IP QR", fun4, nullptr},
   {"Show AP IP QR", fun5, nullptr},
+  {"Toggle WiFi", fun6, nullptr},
+  {"Toggle AP", fun7, nullptr},
   {nullptr, nullptr, nullptr}
 };
 
@@ -96,6 +110,7 @@ menuItem* addMenuEntry(const char* name, void (*action)(), menuItem* menuPtr) {
   newMenu->child = nullptr;
   newMenu->next = currentMenu->next;
   newMenu->prev = currentMenu;
+  newMenu->parentMenuHead = nullptr;
   if(currentMenu->next != nullptr) {
     currentMenu->next->prev = newMenu;
   }
@@ -118,6 +133,7 @@ menuItem* addMenuEntry(const char* name, void (*action)(), menuItem* menuPtr) {
     newMenu->child = nullptr;
     newMenu->next = nullptr;
     newMenu->prev = nullptr;
+    newMenu->parentMenuHead = nullptr;
     currentMenu->child = newMenu;
     currentMenu = newMenu;
     return newMenu;
@@ -185,11 +201,12 @@ void navigateMenu(enum Navigate direction) {
     case LEFT:
       if(selectedItem->parent != nullptr)
         selectedItem = selectedItem->parent;
-        menuHeadPtr = selectedItem;
+        menuHeadPtr = selectedItem->parentMenuHead;
       break;
     case RIGHT:
       if(selectedItem->child != nullptr) {
         selectedItem = selectedItem->child;
+        selectedItem->parentMenuHead = menuHeadPtr;
         menuHeadPtr = selectedItem;
       }
       break;
@@ -209,13 +226,13 @@ void drawMenu() {
   int margin = (display.getHeight() - (ITEM_FONT_HEIGHT * ITEMS_SHOW_AT_ONCE)) / ITEMS_SHOW_AT_ONCE;
   for (int i = 0; i < ITEMS_SHOW_AT_ONCE; i++) {
     if(ptr == selectedItem) {
-      display.fillRect(0, (ITEM_FONT_HEIGHT + margin) * i, display.getWidth() , ITEM_FONT_HEIGHT + margin);
+      display.fillRect(0, (ITEM_FONT_HEIGHT + margin) * i, display.getWidth(), ITEM_FONT_HEIGHT + margin);
       display.setColor(BLACK);
-      display.drawString(0, (i  * ITEM_FONT_HEIGHT) + (margin * (i + 1)), ptr->name);
+      display.drawString(0, (i  * ITEM_FONT_HEIGHT) + (margin * (i + 1)), String(" ") + ptr->name);
       display.setColor(WHITE);
     } else {
       display.drawRect(0, (ITEM_FONT_HEIGHT + margin) * i, display.getWidth(), ITEM_FONT_HEIGHT + margin); 
-      display.drawString(0, (i  * ITEM_FONT_HEIGHT) + (margin * (i + 1)), ptr->name);
+      display.drawString(0, (i  * ITEM_FONT_HEIGHT) + (margin * (i + 1)), String(" ") + ptr->name);
     }
     if(ptr->next == nullptr)
       break;
@@ -232,14 +249,45 @@ void setup() {
   display.clear();
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.flipScreenVertically();
 
   Serial.begin(9600);
 
   createMenu(menu, &root);
   selectedItem = root.child;
   menuHeadPtr = selectedItem;
+  drawMenu();
+
 }
 
 void loop() {
+  if (Serial.available() > 0) {
+    int inByte = Serial.read();
 
+    // Enter key
+    if (inByte == '\n' || inByte == '\r') {
+      navigateMenu(SELECT);
+      drawMenu();
+      // Flush remaining newline characters
+      delay(10);
+      while (Serial.available() > 0 && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
+        Serial.read();
+      }
+    }
+    // Arrow keys (Escape sequence)
+    else if (inByte == 27) {
+      delay(20); // Wait for sequence
+      if (Serial.available() >= 2) {
+        if (Serial.read() == '[') {
+          switch(Serial.read()) {
+            case 'A': navigateMenu(UP); break;
+            case 'B': navigateMenu(DOWN); break;
+            case 'D': navigateMenu(LEFT); break;
+            case 'C': navigateMenu(RIGHT); break;
+          }
+          drawMenu();
+        }
+      }
+    }
+  }
 }
