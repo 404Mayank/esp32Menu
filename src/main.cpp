@@ -28,7 +28,7 @@ struct menuItem {
   menuItem* child;
   menuItem* next;
   menuItem* prev;
-  menuItem* parentMenuHead;
+  menuItem* lastMenuHead;
 };
 
 struct menuDef {
@@ -110,7 +110,7 @@ menuItem* addMenuEntry(const char* name, void (*action)(), menuItem* menuPtr) {
   newMenu->child = nullptr;
   newMenu->next = currentMenu->next;
   newMenu->prev = currentMenu;
-  newMenu->parentMenuHead = nullptr;
+  newMenu->lastMenuHead = nullptr;
   if(currentMenu->next != nullptr) {
     currentMenu->next->prev = newMenu;
   }
@@ -133,7 +133,7 @@ menuItem* addMenuEntry(const char* name, void (*action)(), menuItem* menuPtr) {
     newMenu->child = nullptr;
     newMenu->next = nullptr;
     newMenu->prev = nullptr;
-    newMenu->parentMenuHead = nullptr;
+    newMenu->lastMenuHead = nullptr;
     currentMenu->child = newMenu;
     currentMenu = newMenu;
     return newMenu;
@@ -201,12 +201,12 @@ void navigateMenu(enum Navigate direction) {
     case LEFT:
       if(selectedItem->parent != nullptr)
         selectedItem = selectedItem->parent;
-        menuHeadPtr = selectedItem->parentMenuHead;
+        menuHeadPtr = selectedItem->lastMenuHead != nullptr ? selectedItem->lastMenuHead : selectedItem;
       break;
     case RIGHT:
       if(selectedItem->child != nullptr) {
+        selectedItem->lastMenuHead = menuHeadPtr;
         selectedItem = selectedItem->child;
-        selectedItem->parentMenuHead = menuHeadPtr;
         menuHeadPtr = selectedItem;
       }
       break;
