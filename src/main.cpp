@@ -170,9 +170,12 @@ void navigateMenu(enum Navigate direction) {
   menuItem* ptr = menuHeadPtr;
   switch(direction) {
     case UP:
-      if(selectedItem->prev == nullptr)
+      if(selectedItem->prev == nullptr) {
+        Serial.println("No Prev menu");
         break;
+      }
       else {
+        Serial.println("Navigating Up");
         selectedItem = selectedItem->prev;
         if(selectedItem == menuHeadPtr->prev) {
           menuHeadPtr = menuHeadPtr->prev;;
@@ -180,9 +183,12 @@ void navigateMenu(enum Navigate direction) {
       }
       break;
     case DOWN:
-      if(selectedItem->next == nullptr)
+      if(selectedItem->next == nullptr) {
+        Serial.println("No Next menu");
         break;
+      }
       else {
+        Serial.println("Navigating Down");
         selectedItem = selectedItem->next;
         for(int i = 0; i < (ITEMS_SHOW_AT_ONCE - 1); i++) {
           if(ptr->next == nullptr)
@@ -198,21 +204,38 @@ void navigateMenu(enum Navigate direction) {
       }
       break;
     case LEFT:
-      if(selectedItem->parent->parent != nullptr)
-      if(selectedItem->parent != nullptr)
-        selectedItem = selectedItem->parent;
-        menuHeadPtr = selectedItem->lastMenuHead != nullptr ? selectedItem->lastMenuHead : selectedItem;
+      if(selectedItem->parent->parent != nullptr) {
+        Serial.println("Navigating Left");
+        if(selectedItem->parent != nullptr)
+          selectedItem = selectedItem->parent;
+          menuHeadPtr = selectedItem->lastMenuHead != nullptr ? selectedItem->lastMenuHead : selectedItem;
+      }
+      else {
+        Serial.println("No Parent menu (Reached Root Menu)");
+      }
       break;
     case RIGHT:
       if(selectedItem->child != nullptr) {
+        Serial.println("Navigating Right");
         selectedItem->lastMenuHead = menuHeadPtr;
         selectedItem = selectedItem->child;
         menuHeadPtr = selectedItem;
       }
+      else {
+        Serial.println("No Child menu");
+      }
       break;
     case SELECT:
       if(selectedItem->action != nullptr) {
+        Serial.print("Opening \"");
+        Serial.print(selectedItem->name);
+        Serial.println("\"");
         selectedItem->action();
+      }
+      else {
+        Serial.print("Opening \"");
+        Serial.print(selectedItem->name);
+        Serial.println("\"");
       }
       break;
   }
