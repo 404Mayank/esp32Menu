@@ -95,7 +95,6 @@ menuDef menu[] = {
 };
 
 menuItem root = { "Main Menu", nullptr, nullptr, nullptr, nullptr, nullptr };
-//menuItem* currentMenu = &root;
 
 menuItem* addMenuEntry(const char* name, void (*action)(), menuItem* menuPtr) {
   menuItem* currentMenu = menuPtr;
@@ -199,6 +198,7 @@ void navigateMenu(enum Navigate direction) {
       }
       break;
     case LEFT:
+      if(selectedItem->parent->parent != nullptr)
       if(selectedItem->parent != nullptr)
         selectedItem = selectedItem->parent;
         menuHeadPtr = selectedItem->lastMenuHead != nullptr ? selectedItem->lastMenuHead : selectedItem;
