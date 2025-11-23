@@ -178,7 +178,7 @@ void navigateMenu(enum Navigate direction) {
         Serial.println("Navigating Up");
         selectedItem = selectedItem->prev;
         if(selectedItem == menuHeadPtr->prev) {
-          menuHeadPtr = menuHeadPtr->prev;;
+          menuHeadPtr = menuHeadPtr->prev;
         }
       }
       break;
@@ -206,9 +206,10 @@ void navigateMenu(enum Navigate direction) {
     case LEFT:
       if(selectedItem->parent->parent != nullptr) {
         Serial.println("Navigating Left");
-        if(selectedItem->parent != nullptr)
+        if(selectedItem->parent != nullptr) {
           selectedItem = selectedItem->parent;
           menuHeadPtr = selectedItem->lastMenuHead != nullptr ? selectedItem->lastMenuHead : selectedItem;
+        }
       }
       else {
         Serial.println("No Parent menu (Reached Root Menu)");
@@ -226,16 +227,11 @@ void navigateMenu(enum Navigate direction) {
       }
       break;
     case SELECT:
+      Serial.print("Opening \"");
+      Serial.print(selectedItem->name);
+      Serial.println("\"");
       if(selectedItem->action != nullptr) {
-        Serial.print("Opening \"");
-        Serial.print(selectedItem->name);
-        Serial.println("\"");
         selectedItem->action();
-      }
-      else {
-        Serial.print("Opening \"");
-        Serial.print(selectedItem->name);
-        Serial.println("\"");
       }
       break;
   }
