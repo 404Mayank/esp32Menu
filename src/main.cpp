@@ -204,12 +204,10 @@ void navigateMenu(enum Navigate direction) {
       }
       break;
     case LEFT:
-      if(selectedItem->parent->parent != nullptr) {
+      if(selectedItem->parent != nullptr && selectedItem->parent->parent != nullptr) {
         Serial.println("Navigating Left");
-        if(selectedItem->parent != nullptr) {
-          selectedItem = selectedItem->parent;
-          menuHeadPtr = selectedItem->lastMenuHead != nullptr ? selectedItem->lastMenuHead : selectedItem;
-        }
+        selectedItem = selectedItem->parent;
+        menuHeadPtr = selectedItem->lastMenuHead != nullptr ? selectedItem->lastMenuHead : selectedItem;
       }
       else {
         Serial.println("No Parent menu (Reached Root Menu)");
