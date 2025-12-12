@@ -8,6 +8,28 @@
 #define ITEMS_SHOW_AT_ONCE 3
 #define ITEM_FONT_HEIGHT 16
 
+//Button Defines
+#define BTN_UP      19
+#define BTN_DOWN    23
+#define BTN_SELECT  15
+#define BTN_BACK    0   // Built-in BOOT button
+unsigned long lastButtonPress = 0;
+const int debounceTime = 200;
+
+//LED Defines
+#define LED_PIN 2
+
+// Non-blocking LED blink
+bool ledBlinking = false;
+unsigned long ledBlinkStart = 0;
+const unsigned long ledBlinkDuration = 50;
+
+void blinkLED() {
+  ledBlinking = true;
+  ledBlinkStart = millis();
+  digitalWrite(LED_PIN, HIGH);
+}
+
 //SCREEN START
 //margin 4px
 //fisrt MENU ITEM (16px)
@@ -268,6 +290,15 @@ void setup() {
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.flipScreenVertically();
 
+  //buttons
+  pinMode(BTN_UP, INPUT_PULLUP);
+  pinMode(BTN_DOWN, INPUT_PULLUP);
+  pinMode(BTN_SELECT, INPUT_PULLUP);
+  pinMode(BTN_BACK, INPUT_PULLUP);
+
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+
   Serial.begin(9600);
 
   createMenu(menu, &root);
@@ -278,33 +309,47 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available() > 0) {
-    int inByte = Serial.read();
+  // Handle non-blocking LED blink
+  if (ledBlinking && (millis() - ledBlinkStart >= ledBlinkDuration)) {
+    digitalWrite(LED_PIN, LOW);
+    ledBlinking = false;
+  }
 
-    // Enter key
-    if (inByte == '\n' || inByte == '\r') {
-      navigateMenu(SELECT);
+  // Simple non-blocking debounce check
+  if (millis() - lastButtonPress > debounceTime) {
+    // CHECK UP
+    if (digitalRead(BTN_UP) == LOW) {
+      blinkLED();
+      navigateMenu(UP);
       drawMenu();
-      // Flush remaining newline characters
-      delay(10);
-      while (Serial.available() > 0 && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
-        Serial.read();
-      }
+      lastButtonPress = millis();
     }
-    // Arrow keys (Escape sequence)
-    else if (inByte == 27) {
-      delay(20); // Wait for sequence
-      if (Serial.available() >= 2) {
-        if (Serial.read() == '[') {
-          switch(Serial.read()) {
-            case 'A': navigateMenu(UP); break;
-            case 'B': navigateMenu(DOWN); break;
-            case 'D': navigateMenu(LEFT); break;
-            case 'C': navigateMenu(RIGHT); break;
-          }
-          drawMenu();
-        }
+    // CHECK DOWN
+    else if (digitalRead(BTN_DOWN) == LOW) {
+      blinkLED();
+      navigateMenu(DOWN);
+      drawMenu();
+      lastButtonPress = millis();
+    }
+    // CHECK SELECT (Smart Select)
+    // If the item has a sub-menu, go RIGHT (Enter). 
+    // If not, trigger SELECT (Action).
+    else if (digitalRead(BTN_SELECT) == LOW) {
+      blinkLED();
+      if (selectedItem->child != nullptr) {
+        navigateMenu(RIGHT);
+      } else {
+        navigateMenu(SELECT);
       }
+      drawMenu();
+      lastButtonPress = millis();
+    }
+    // CHECK BACK
+    else if (digitalRead(BTN_BACK) == LOW) {
+      blinkLED();
+      navigateMenu(LEFT);
+      drawMenu();
+      lastButtonPress = millis();
     }
   }
 }
