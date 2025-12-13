@@ -15,6 +15,10 @@ public:
     void print();
     void navigate(Navigate direction);
 
+    void setStyle(int style);
+    int getStyle() const;
+    void toggleStyle();
+
     void updateBorder(int border);
     void updateGap(int gap);
     void updatePadding(int padding);

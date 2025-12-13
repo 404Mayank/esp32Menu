@@ -9,6 +9,9 @@ class menuOledPrinter {
     menuOledPrinter() = default;
     menuOledPrinter(SSD1306Wire* display, int screenWidth, int screenHeight, int itemFontHeight, menuNavigator* navigator);
     void print();
+    void setStyle(int style);
+    int getStyle() const;
+    void toggleStyle();
     void updateItemsShowAtOnce();
     void updateBorder(int border);
     void updateGap(int gap);
@@ -22,7 +25,8 @@ class menuOledPrinter {
     int itemsShowAtOnce;
     int itemFontHeight;
     menuNavigator* navigator;
-    int gap = 1;
+    int style = 0;
+    int gap = 0;
     int border = 1;
     int padding = 2;
 };

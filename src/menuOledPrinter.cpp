@@ -11,6 +11,18 @@ menuOledPrinter::menuOledPrinter(SSD1306Wire* display, int screenWidth, int scre
     updateItemsShowAtOnce();
 }
 
+void menuOledPrinter::setStyle(int style) {
+    this->style = style;
+}
+
+int menuOledPrinter::getStyle() const {
+    return this->style;
+}
+
+void menuOledPrinter::toggleStyle() {
+    this->style = (this->style == 0) ? 1 : 0;
+}
+
 void menuOledPrinter::updateItemsShowAtOnce() {
     this->itemsShowAtOnce = (screenHeight) / (itemFontHeight + (this->gap + this->border + this->padding) * 2);
 }
@@ -37,6 +49,8 @@ void menuOledPrinter::updateFontHeight(int fontHeight) {
 
 void menuOledPrinter::print() {
     display->clear();
+    // Always start from a known draw color; SSD1306Wire keeps color state across frames.
+    display->setColor(WHITE);
     menuItem* currentItem = navigator->getCurrentItem();
 
     menuItem* topItem = currentItem;
@@ -53,11 +67,31 @@ void menuOledPrinter::print() {
             break;
         }
         if (topItem == currentItem) {
-            // Highlight current item
-            display->fillRect(0, y + this->gap, screenWidth, itemFontHeight + 2 * this->padding);
-        }
-        if (topItem == currentItem) {
-            display->setColor(BLACK);
+            const int rowX = 0;
+            const int rowY = y + this->gap;
+            const int rowW = screenWidth;
+            const int rowH = itemFontHeight + 2 * this->padding;
+
+            if (this->style == 0) {
+                // Filled highlight (current behavior)
+                display->setColor(WHITE);
+                display->fillRect(rowX, rowY, rowW, rowH);
+                display->setColor(BLACK);
+            } else {
+                // Hollow highlight: border controls line thickness
+                display->setColor(WHITE);
+                const int thickness = (this->border <= 0) ? 1 : this->border;
+                for (int t = 0; t < thickness; t++) {
+                    const int x = rowX + t;
+                    const int yy = rowY + t;
+                    const int w = rowW - 2 * t;
+                    const int h = rowH - 2 * t;
+                    if (w <= 0 || h <= 0) break;
+                    display->drawRect(x, yy, w, h);
+                }
+                // SSD1306 is monochrome; keep text WHITE for this style.
+                display->setColor(WHITE);
+            }
         } else {
             display->setColor(WHITE);
         }

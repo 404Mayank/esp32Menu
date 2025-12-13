@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <SSD1306Wire.h>   
 #include "Menu.h"
+#include <Preferences.h>
 
 //Display Defines
 #define SCREEN_ADDRESS 0x3C
@@ -197,8 +198,12 @@ void fun3() {
   Serial.println("fun3: Showing AP QR Code...");
 }
 
+Preferences preferences;
+
 void fun4() {
   Serial.println("fun4: Showing WiFi IP QR Code...");
+  menu.toggleStyle();
+  preferences.putInt("menuStyle", menu.getStyle());
 }
 
 void fun5() {
@@ -259,8 +264,10 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
-  Serial.begin(9600);
+  preferences.begin("Meshmerize", false); 
 
+  Serial.begin(9600);
+  menu.setStyle(preferences.getInt("menuStyle", 0));
   menu.print();
 }
 

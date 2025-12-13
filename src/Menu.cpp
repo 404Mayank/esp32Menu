@@ -30,6 +30,25 @@ void Menu::navigate(Navigate direction) {
     navigator->navigate(direction);
 }
 
+void Menu::setStyle(int style) {
+    if (printer != nullptr) {
+        printer->setStyle(style);
+    }
+}
+
+int Menu::getStyle() const {
+    if (printer != nullptr) {
+        return printer->getStyle();
+    }
+    return 0;
+}
+
+void Menu::toggleStyle() {
+    if (printer != nullptr) {
+        printer->toggleStyle();
+    }
+}
+
 void Menu::updateBorder(int border) {
     if (printer != nullptr) {
         printer->updateBorder(border);
