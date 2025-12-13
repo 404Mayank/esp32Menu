@@ -1,28 +1,147 @@
 #include <Arduino.h>
 #include <SSD1306Wire.h>   
+#include "Menu.h"
 
 //Display Defines
 #define SCREEN_ADDRESS 0x3C
 #define OLED_SDA  21
 #define OLED_SCL  22
 #define ITEMS_SHOW_AT_ONCE 3
-#define ITEM_FONT_HEIGHT 16
+#define ITEM_FONT_HEIGHT 10
 
 //Button Defines
 #define BTN_UP      19
 #define BTN_DOWN    23
 #define BTN_SELECT  15
 #define BTN_BACK    0   // Built-in BOOT button
-unsigned long lastButtonPress = 0;
-const int debounceTime = 200;
+const uint32_t debounceTimeMs = 40;
 
 //LED Defines
 #define LED_PIN 2
+
+//Menu Defines
+#define MENU_SIZE 20  // Max number of menu items or exact (preferably)
+
 
 // Non-blocking LED blink
 bool ledBlinking = false;
 unsigned long ledBlinkStart = 0;
 const unsigned long ledBlinkDuration = 50;
+
+void blinkLED();
+extern Menu menu;
+
+static void navigateAndRender(Navigate direction) {
+  blinkLED();
+  menu.navigate(direction);
+  menu.print();
+}
+
+static void handleSerialControl() {
+  // Accept single-character commands (no newline required)
+  // - Up:    'u'/'U' or 'w'/'W'
+  // - Down:  'd'/'D' or 's'/'S'
+  // - Left:  'l'/'L' or 'a'/'A'
+  // - Right: 'r'/'R' or 'd'/'D' (note: 'd' is reserved for Down above)
+  // Also accepts full words terminated by newline: up/down/left/right.
+
+  static char token[16];
+  static uint8_t tokenLen = 0;
+
+  while (Serial.available() > 0) {
+    const char c = (char)Serial.read();
+
+    // Ignore common whitespace
+    if (c == '\r' || c == '\n' || c == ' ' || c == '\t') {
+      if ((c == '\r' || c == '\n') && tokenLen > 0) {
+        token[tokenLen] = '\0';
+
+        // Normalize simple words
+        if (strcmp(token, "up") == 0) {
+          navigateAndRender(UP);
+        } else if (strcmp(token, "down") == 0) {
+          navigateAndRender(DOWN);
+        } else if (strcmp(token, "left") == 0) {
+          navigateAndRender(LEFT);
+        } else if (strcmp(token, "right") == 0) {
+          navigateAndRender(RIGHT);
+        }
+
+        tokenLen = 0;
+      }
+      continue;
+    }
+
+    // Single-key immediate controls
+    switch (c) {
+      case 'u':
+      case 'U':
+      case 'w':
+      case 'W':
+        navigateAndRender(UP);
+        tokenLen = 0;
+        continue;
+      case 's':
+      case 'S':
+        navigateAndRender(DOWN);
+        tokenLen = 0;
+        continue;
+      case 'l':
+      case 'L':
+      case 'a':
+      case 'A':
+        navigateAndRender(LEFT);
+        tokenLen = 0;
+        continue;
+      case 'r':
+      case 'R':
+        navigateAndRender(RIGHT);
+        tokenLen = 0;
+        continue;
+      case 'd':
+      case 'D':
+        // Ambiguous with Down; prefer Down for 'd' to match "down".
+        navigateAndRender(DOWN);
+        tokenLen = 0;
+        continue;
+      default:
+        break;
+    }
+
+    // Accumulate word tokens (lowercased)
+    if (tokenLen < sizeof(token) - 1) {
+      char lower = c;
+      if (lower >= 'A' && lower <= 'Z') lower = (char)(lower - 'A' + 'a');
+      token[tokenLen++] = lower;
+    }
+  }
+}
+
+struct DebouncedButton {
+  uint8_t pin;
+  bool stableState;
+  bool lastReading;
+  uint32_t lastChangeMs;
+};
+
+static bool readPressedEdge(DebouncedButton &btn) {
+  const bool reading = (digitalRead(btn.pin) == LOW);
+
+  if (reading != btn.lastReading) {
+    btn.lastReading = reading;
+    btn.lastChangeMs = millis();
+  }
+
+  if ((millis() - btn.lastChangeMs) >= debounceTimeMs) {
+    if (reading != btn.stableState) {
+      btn.stableState = reading;
+      // Return true on the stable falling-edge (button press)
+      if (btn.stableState) return true;
+    }
+  }
+
+  return false;
+}
 
 void blinkLED() {
   ledBlinking = true;
@@ -43,26 +162,9 @@ void blinkLED() {
 //TOTAL HEIGHT 64PX
 //VISIBLE ITEMS 3
 
-struct menuItem {
-  const char* name;
-  void (*action)();
-  menuItem* parent;
-  menuItem* child;
-  menuItem* next;
-  menuItem* prev;
-  menuItem* lastMenuHead;
-};
 
-struct menuDef {
-  const char* name;
-  void (*action)();
-  struct menuDef* subs;
-};
-
-// Globals
+//OLED Globals
 SSD1306Wire display(SCREEN_ADDRESS, OLED_SDA, OLED_SCL, GEOMETRY_128_64);
-//MenuGlobals
-enum Navigate {UP, DOWN, LEFT, RIGHT, SELECT};
 
 void fun1() {
   Serial.println("fun1: Connecting to WiFi...");
@@ -92,7 +194,7 @@ void fun7() {
   Serial.println("fun7: Toggling AP...");
 }
 
-// Menu Defination = {name, action, sub menu definition, last menu head position(self-managed) }
+// Menu Defination = {name, action, sub menu definition}
 // Declare menu heigrarchy Bottom -> Top 
 
 menuDef QRCodesDef[] = {
@@ -101,185 +203,24 @@ menuDef QRCodesDef[] = {
   {"Show AP IP QR", fun5, nullptr},
   {"Toggle WiFi", fun6, nullptr},
   {"Toggle AP", fun7, nullptr},
-  {nullptr, nullptr, nullptr}
+  {} //auto initializes last item as nullptr
 };
 
 menuDef WifiDef[] = {
   {"Connect to WiFi", fun1, nullptr},
   {"Start Access Point", fun2, nullptr},
-  {nullptr, nullptr, nullptr}
+  {}
 };
 
-menuDef menu[] = {
+menuDef root[] = {
   {"Wifi", nullptr, WifiDef},
   {"QR Codes", nullptr, QRCodesDef},
-  {nullptr, nullptr, nullptr}
+  {}
 };
 
-menuItem root = { "Main Menu", nullptr, nullptr, nullptr, nullptr, nullptr };
+//Menu GLobals
+Menu menu(&display, root, MENU_SIZE, 128, 64, ITEM_FONT_HEIGHT);
 
-menuItem* addMenuEntry(const char* name, void (*action)(), menuItem* menuPtr) {
-  menuItem* currentMenu = menuPtr;
-  menuItem* newMenu = (struct menuItem*)malloc(sizeof(struct menuItem));
-  if (newMenu == NULL) {
-    Serial.println("Memory allocation failed");
-    return nullptr;
-  }
-  newMenu->name = name;
-  newMenu->action = action;
-  newMenu->parent = currentMenu->parent;
-  newMenu->child = nullptr;
-  newMenu->next = currentMenu->next;
-  newMenu->prev = currentMenu;
-  newMenu->lastMenuHead = nullptr;
-  if(currentMenu->next != nullptr) {
-    currentMenu->next->prev = newMenu;
-  }
-  currentMenu->next = newMenu;
-  currentMenu = newMenu;
-  return newMenu;
-}
-
- menuItem* addSubMenuEntry(const char* name, void (*action)(), menuItem* menuPtr) {
-  menuItem* currentMenu = menuPtr;
-  if (currentMenu->child == nullptr) {
-      menuItem* newMenu = (struct menuItem*)malloc(sizeof(struct menuItem));
-    if (newMenu == NULL) {
-      Serial.println("Memory allocation failed");
-      return nullptr;
-    }
-    newMenu->name = name;
-    newMenu->action = action;
-    newMenu->parent = currentMenu;
-    newMenu->child = nullptr;
-    newMenu->next = nullptr;
-    newMenu->prev = nullptr;
-    newMenu->lastMenuHead = nullptr;
-    currentMenu->child = newMenu;
-    currentMenu = newMenu;
-    return newMenu;
-  } else {
-    currentMenu = currentMenu->child;
-    while (currentMenu->next != nullptr) {
-    currentMenu = currentMenu->next;
-    }
-    return addMenuEntry(name, action, currentMenu);
-  }
-}
-
-void createMenu(menuDef* defs, menuItem* root) {
-  menuItem* menuPtr = root;
-  menuItem* lastItem = nullptr;
-
-  for(int i = 0; defs[i].name != nullptr; i++) {
-    menuItem* tmpPtr;
-    if(i == 0) {
-      tmpPtr = addSubMenuEntry(defs[i].name, defs[i].action, menuPtr);
-    } else {
-      tmpPtr = addMenuEntry(defs[i].name, defs[i].action, lastItem);
-    }
-    lastItem = tmpPtr;
-    if(defs[i].subs != nullptr) {
-      createMenu(defs[i].subs, tmpPtr);
-    }
-  }
-}
-
-  menuItem* selectedItem;
-  menuItem* menuHeadPtr;
-
-void navigateMenu(enum Navigate direction) {
-  menuItem* ptr = menuHeadPtr;
-  switch(direction) {
-    case UP:
-      if(selectedItem->prev == nullptr) {
-        Serial.println("No Prev menu");
-        break;
-      }
-      else {
-        Serial.println("Navigating Up");
-        selectedItem = selectedItem->prev;
-        if(selectedItem == menuHeadPtr->prev) {
-          menuHeadPtr = menuHeadPtr->prev;
-        }
-      }
-      break;
-    case DOWN:
-      if(selectedItem->next == nullptr) {
-        Serial.println("No Next menu");
-        break;
-      }
-      else {
-        Serial.println("Navigating Down");
-        selectedItem = selectedItem->next;
-        for(int i = 0; i < (ITEMS_SHOW_AT_ONCE - 1); i++) {
-          if(ptr->next == nullptr)
-            break;
-          else if(selectedItem == ptr)
-            break;
-          else {
-            ptr = ptr->next;
-          }
-        }
-        if(selectedItem != ptr)
-          menuHeadPtr = menuHeadPtr->next;
-      }
-      break;
-    case LEFT:
-      if(selectedItem->parent != nullptr && selectedItem->parent->parent != nullptr) {
-        Serial.println("Navigating Left");
-        selectedItem = selectedItem->parent;
-        menuHeadPtr = selectedItem->lastMenuHead != nullptr ? selectedItem->lastMenuHead : selectedItem;
-      }
-      else {
-        Serial.println("No Parent menu (Reached Root Menu)");
-      }
-      break;
-    case RIGHT:
-      if(selectedItem->child != nullptr) {
-        Serial.println("Navigating Right");
-        selectedItem->lastMenuHead = menuHeadPtr;
-        selectedItem = selectedItem->child;
-        menuHeadPtr = selectedItem;
-      }
-      else {
-        Serial.println("No Child menu");
-      }
-      break;
-    case SELECT:
-      Serial.print("Opening \"");
-      Serial.print(selectedItem->name);
-      Serial.println("\"");
-      if(selectedItem->action != nullptr) {
-        selectedItem->action();
-      }
-      break;
-  }
-}
-
-void drawMenu() {
-  menuItem* ptr = menuHeadPtr;
-  display.clear();
-  display.setFont(ArialMT_Plain_10);
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  int margin = (display.getHeight() - (ITEM_FONT_HEIGHT * ITEMS_SHOW_AT_ONCE)) / ITEMS_SHOW_AT_ONCE;
-  for (int i = 0; i < ITEMS_SHOW_AT_ONCE; i++) {
-    if(ptr == selectedItem) {
-      display.fillRect(0, (ITEM_FONT_HEIGHT + margin) * i, display.getWidth(), ITEM_FONT_HEIGHT + margin);
-      display.setColor(BLACK);
-      display.drawString(0, (i  * ITEM_FONT_HEIGHT) + (margin * (i + 1)), String(" ") + ptr->name);
-      display.setColor(WHITE);
-    } else {
-      display.drawRect(0, (ITEM_FONT_HEIGHT + margin) * i, display.getWidth(), ITEM_FONT_HEIGHT + margin); 
-      display.drawString(0, (i  * ITEM_FONT_HEIGHT) + (margin * (i + 1)), String(" ") + ptr->name);
-    }
-    if(ptr->next == nullptr)
-      break;
-    else
-      ptr = ptr->next;
-  }
-  display.display();
-}
 
 void setup() {
   //Display Setup
@@ -301,55 +242,41 @@ void setup() {
 
   Serial.begin(9600);
 
-  createMenu(menu, &root);
-  selectedItem = root.child;
-  menuHeadPtr = selectedItem;
-  drawMenu();
-
+  menu.print();
 }
 
 void loop() {
+  handleSerialControl();
+
   // Handle non-blocking LED blink
   if (ledBlinking && (millis() - ledBlinkStart >= ledBlinkDuration)) {
     digitalWrite(LED_PIN, LOW);
     ledBlinking = false;
   }
 
-  // Simple non-blocking debounce check
-  if (millis() - lastButtonPress > debounceTime) {
-    // CHECK UP
-    if (digitalRead(BTN_UP) == LOW) {
-      blinkLED();
-      navigateMenu(UP);
-      drawMenu();
-      lastButtonPress = millis();
-    }
-    // CHECK DOWN
-    else if (digitalRead(BTN_DOWN) == LOW) {
-      blinkLED();
-      navigateMenu(DOWN);
-      drawMenu();
-      lastButtonPress = millis();
-    }
-    // CHECK SELECT (Smart Select)
-    // If the item has a sub-menu, go RIGHT (Enter). 
-    // If not, trigger SELECT (Action).
-    else if (digitalRead(BTN_SELECT) == LOW) {
-      blinkLED();
-      if (selectedItem->child != nullptr) {
-        navigateMenu(RIGHT);
-      } else {
-        navigateMenu(SELECT);
-      }
-      drawMenu();
-      lastButtonPress = millis();
-    }
-    // CHECK BACK
-    else if (digitalRead(BTN_BACK) == LOW) {
-      blinkLED();
-      navigateMenu(LEFT);
-      drawMenu();
-      lastButtonPress = millis();
-    }
+  static DebouncedButton btnUp{BTN_UP, false, false, 0};
+  static DebouncedButton btnDown{BTN_DOWN, false, false, 0};
+  static DebouncedButton btnSelect{BTN_SELECT, false, false, 0};
+  static DebouncedButton btnBack{BTN_BACK, false, false, 0};
+
+  if (readPressedEdge(btnUp)) {
+    Serial.println("BTN_UP pressed");
+    navigateAndRender(UP);
+  }
+
+  if (readPressedEdge(btnDown)) {
+    Serial.println("BTN_DOWN pressed");
+    navigateAndRender(DOWN);
+  }
+
+  if (readPressedEdge(btnSelect)) {
+    Serial.println("BTN_SELECT pressed");
+    // In this menu implementation, RIGHT both enters submenus and selects leaf actions.
+    navigateAndRender(RIGHT);
+  }
+
+  if (readPressedEdge(btnBack)) {
+    Serial.println("BTN_BACK pressed");
+    navigateAndRender(LEFT);
   }
 }
