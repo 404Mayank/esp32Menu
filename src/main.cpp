@@ -38,18 +38,37 @@ static void navigateAndRender(Navigate direction) {
 }
 
 static void handleSerialControl() {
-  // Accept single-character commands (no newline required)
-  // - Up:    'u'/'U' or 'w'/'W'
-  // - Down:  'd'/'D' or 's'/'S'
-  // - Left:  'l'/'L' or 'a'/'A'
-  // - Right: 'r'/'R' or 'd'/'D' (note: 'd' is reserved for Down above)
-  // Also accepts full words terminated by newline: up/down/left/right.
-
   static char token[16];
   static uint8_t tokenLen = 0;
+  static uint8_t escState = 0; // 0=normal, 1=got ESC, 2=got ESC[
 
   while (Serial.available() > 0) {
     const char c = (char)Serial.read();
+
+    // Handle ANSI escape sequences for arrow keys
+    if (escState == 0 && c == '\x1B') {
+      escState = 1;
+      continue;
+    }
+    if (escState == 1) {
+      if (c == '[') {
+        escState = 2;
+        continue;
+      } else {
+        escState = 0; // Not a valid escape sequence
+      }
+    }
+    if (escState == 2) {
+      escState = 0;
+      switch (c) {
+        case 'A': navigateAndRender(UP);    continue;
+        case 'B': navigateAndRender(DOWN);  continue;
+        case 'C': navigateAndRender(RIGHT); continue;
+        case 'D': navigateAndRender(LEFT);  continue;
+        default: break; // Unknown escape sequence
+      }
+      continue;
+    }
 
     // Ignore common whitespace
     if (c == '\r' || c == '\n' || c == ' ' || c == '\t') {
