@@ -14,7 +14,7 @@
 #define BTN_UP      19
 #define BTN_DOWN    23
 #define BTN_SELECT  15
-#define BTN_BACK    0   // Built-in BOOT button
+#define BTN_BACK    12   
 const uint32_t debounceTimeMs = 40;
 
 //LED Defines
@@ -253,7 +253,6 @@ void setup() {
   display.clear();
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.flipScreenVertically();
 
   //buttons
   pinMode(BTN_UP, INPUT_PULLUP);
