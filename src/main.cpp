@@ -33,7 +33,6 @@ void blinkLED();
 extern Menu menu;
 
 static void navigateAndRender(Navigate direction) {
-  blinkLED();
   menu.navigate(direction);
   menu.print();
 }
@@ -163,6 +162,36 @@ static bool readPressedEdge(DebouncedButton &btn) {
   return false;
 }
 
+static void handleMenu() {
+  handleSerialControl();
+
+  static DebouncedButton btnUp{BTN_UP, false, false, 0};
+  static DebouncedButton btnDown{BTN_DOWN, false, false, 0};
+  static DebouncedButton btnSelect{BTN_SELECT, false, false, 0};
+  static DebouncedButton btnBack{BTN_BACK, false, false, 0};
+
+  if (readPressedEdge(btnUp)) {
+    Serial.println("BTN_UP pressed");
+    navigateAndRender(UP);
+  }
+
+  if (readPressedEdge(btnDown)) {
+    Serial.println("BTN_DOWN pressed");
+    navigateAndRender(DOWN);
+  }
+
+  if (readPressedEdge(btnSelect)) {
+    Serial.println("BTN_SELECT pressed");
+    // In this menu implementation, RIGHT both enters submenus and selects leaf actions.
+    navigateAndRender(RIGHT);
+  }
+
+  if (readPressedEdge(btnBack)) {
+    Serial.println("BTN_BACK pressed");
+    navigateAndRender(LEFT);
+  }
+}
+
 void blinkLED() {
   ledBlinking = true;
   ledBlinkStart = millis();
@@ -271,37 +300,11 @@ void setup() {
 }
 
 void loop() {
-  handleSerialControl();
-
   // Handle non-blocking LED blink
   if (ledBlinking && (millis() - ledBlinkStart >= ledBlinkDuration)) {
     digitalWrite(LED_PIN, LOW);
     ledBlinking = false;
   }
 
-  static DebouncedButton btnUp{BTN_UP, false, false, 0};
-  static DebouncedButton btnDown{BTN_DOWN, false, false, 0};
-  static DebouncedButton btnSelect{BTN_SELECT, false, false, 0};
-  static DebouncedButton btnBack{BTN_BACK, false, false, 0};
-
-  if (readPressedEdge(btnUp)) {
-    Serial.println("BTN_UP pressed");
-    navigateAndRender(UP);
-  }
-
-  if (readPressedEdge(btnDown)) {
-    Serial.println("BTN_DOWN pressed");
-    navigateAndRender(DOWN);
-  }
-
-  if (readPressedEdge(btnSelect)) {
-    Serial.println("BTN_SELECT pressed");
-    // In this menu implementation, RIGHT both enters submenus and selects leaf actions.
-    navigateAndRender(RIGHT);
-  }
-
-  if (readPressedEdge(btnBack)) {
-    Serial.println("BTN_BACK pressed");
-    navigateAndRender(LEFT);
-  }
+  handleMenu();
 }
