@@ -5,6 +5,7 @@ public:
   menuItem() = default;
   const char* name = nullptr;
   void (*action)() = nullptr;
+  menuItem* navParent = nullptr;
 
   const char* getName() const;
   void init(const char* itemName, void (*itemAction)(), menuItem* parentItem, menuItem* childItem, menuItem* nextItem, menuItem* prevItem);

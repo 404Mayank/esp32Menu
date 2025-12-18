@@ -2,7 +2,7 @@
 #include "menuItem.h"
 
 menuNavigator::menuNavigator(menuItem* root) 
-    : currentItem(root), rootItem(root)
+    : currentItem(root)
 {}
 
 void menuNavigator::navigate(Navigate direction) {
@@ -19,15 +19,15 @@ void menuNavigator::navigate(Navigate direction) {
             break;
         case LEFT:
             if (currentItem->getParent() != nullptr) {
-                if (rootItem == nullptr) {
-                    rootItem = currentItem->getParent();
+                if (currentItem->navParent == nullptr) {
+                    currentItem->navParent = currentItem->getParent();
                 }
-                currentItem = rootItem;
+                currentItem = currentItem->navParent;
             }
             break;
         case RIGHT:
             if (currentItem->getChild() != nullptr) {
-                rootItem = currentItem;
+                currentItem->getChild()->navParent = currentItem;
                 currentItem = currentItem->getChild();
             }
             else if (currentItem->action != nullptr) {

@@ -13,5 +13,4 @@ class menuNavigator {
 
     private:
     menuItem* currentItem = nullptr;
-    menuItem* rootItem = nullptr;
 };
